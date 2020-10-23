@@ -3,14 +3,17 @@ from django.http import HttpResponse
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from api_requests.authentication import auth
-from .models import ApiToken, User, Investor
+from .models import ApiToken, User, Investor, Transaction
 from rest_framework.permissions import IsAuthenticated
-from api_requests.create_customer import create_customer
+from api_requests.update_investor import update_investor
+from api_requests.create_investor import create_investor
 from api_requests.get_market_symbol import get_market_symbol
 from api_requests.get_market_data import get_market_data
 from api_requests.get_investors import get_investors
 from api_requests.create_transaction import create_transaction
 from api_requests.get_transactions import get_transactions
+from api_requests.update_kyc import update_kyc
+from api_requests.cancel_transaction import cancel_transaction
 
 
 # Create your views here.
@@ -100,7 +103,7 @@ class CreateCustomer(APIView):
         api_token = ApiToken.objects.first()
         if not api_token:
             return Response({'message': 'api authentication is required'}, 403)
-        response = create_customer(
+        response = update_investor(
             api_token.access_token, request.data['title'], request.data['surname'], request.data['first_name'],
             request.data['other_names'], request.data['gender'], request.data['phone'],
             request.data['date_of_birth'], request.data['email_address'], request.data['home_phone'],
@@ -131,6 +134,65 @@ class CreateCustomer(APIView):
                 investor_no=response['data']['investor_no'],
             )
             return Response({'data': response['data']}, 201)
+        return Response({'message': 'something went wrong'}, 400)
+
+
+class UpdateCustomer(APIView):
+
+    def post(self, request):
+        errors = field_verification(request.data, [
+            'id',
+            'title',
+            'surname',
+            'first_name',
+            'other_names',
+            'gender',
+            'phone',
+            'date_of_birth',
+            'email_address',
+            'address',
+            'country',
+            'state',
+            'nationality',
+            'city',
+            'bank_account_number',
+            'bank_account_name',
+            'bank_name',
+            'bank_code',
+            'branch_code',
+            'acc_type',
+            'company_name',
+            'next_of_kin_name',
+        ])
+        user = User.objects.filter(username=request.data.get('email_address')).first()
+        if user:
+            if user != request.user:
+                errors['email'] = 'this email has been registered'
+        if len(errors) > 0:
+            return Response({'errors': errors}, 400)
+        
+        api_token = ApiToken.objects.first()
+        if not api_token:
+            return Response({'message': 'api authentication is required'}, 403)
+        response = update_investor(
+            api_token.access_token, request.data['id'], request.data['title'], 
+            request.data['surname'], request.data['first_name'], request.data['other_names'], 
+            request.data['gender'], request.data['phone'], request.data['date_of_birth'], 
+            request.data['email_address'], request.data['address'], request.data['country'], 
+            request.data['state'], request.data['nationality'], request.data['city'],
+            request.data['bank_account_number'], request.data['bank_account_name'],
+            request.data['bank_code'], request.data['branch_code'], request.data['acc_type'],
+            request.data['company_name'], request.data['next_of_kin_name']
+        )
+        print(response)
+        if response['status'] == 400:
+            return Response({'errors': response['errors']}, 400)
+        if response['status'] == 200:
+            user = request.user
+            user.username=request.data['email_address']
+            user.email=request.data['email_address']
+            user.save()
+            return Response({'data': response['data']}, 200)
         return Response({'message': 'something went wrong'}, 400)
 
 
@@ -217,15 +279,26 @@ class CreateListTransaction(APIView):
             return Response({'errors': errors}, 400)
         try:
             user = request.user
-            
             response = create_transaction(self.access_token, user.investor.investor_id, request.data['instructions'],
             request.data['trade_date_limit'], request.data['trade_action'], request.data['trade_price_limit'], request.data['trade_effective_date'],
             request.data['trade_units'], request.data['stock_code'])
-            print(response)
             if response['status'] == 200:
+                Transaction.objects.create(
+                    user=user,
+                    transaction_ref=response["transaction_ref"],
+                    instructions=request.data['instructions'],
+                    trade_date_limit=request.data['trade_date_limit'],
+                    trade_effective_date=request.data['trade_effective_date'],
+                    trade_action=request.data['trade_action'],
+                    trade_price_limit=request.data['trade_price_limit'],
+                    trade_unit=request.data['trade_units'],
+                    stock_code=request.data['stock_code'],
+                )
+                print(response['transaction_ref'])
                 return Response({'message': 'transaction has been created successfully'})
             return Response({'error': 'something went wrong'}, 400)
-        except:
+        except Exception as error:
+            print(error)
             return Response({'error': 'user does not exist'}, 404)
 
     def get(self, request):
@@ -237,3 +310,34 @@ class CreateListTransaction(APIView):
         if response['status'] == 200:
             return Response({'data': response['data']})
         return Response({'error': 'bad request'}, 400)
+
+
+class UpdateKyc(APIView):
+
+    def post(self, request):
+
+        errors = field_verification(request.data, ['files'])
+
+        if len(errors) > 0:
+            return Response(errors, 400)
+
+        access_token = ApiToken.objects.first().access_token
+        response = update_kyc(access_token, request.data['id'], 
+        request.data.get('files').file)
+
+        print(response)
+        if response['status'] == 200:
+            return Response({'data': response['data']})
+        return Response({'error': 'something went wrong'}, 400)
+
+
+class CancelTransaction(APIView):
+
+    def delete(self, delete, pk=None):
+        try:
+            transaction = Transaction.objects.get(pk=pk)
+            access_token = ApiToken.objects.first().access_token
+            response = cancel_transaction(access_token, transaction.transaction_ref)
+            print(response)
+        except Transaction.DoesNotExist:
+            return Response({'error': 'transaction cannot be found'}, 404)

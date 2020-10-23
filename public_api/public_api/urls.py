@@ -19,7 +19,8 @@ from accounts.views import (
     home, GetAccessToken, CreateCustomer,
     GetMarketSymbol, GetMarketData,
     GetInvestors, GetInvestorById,
-    CreateListTransaction
+    CreateListTransaction, UpdateCustomer,
+    UpdateKyc, CancelTransaction
 )
 
 from rest_framework_jwt.views import obtain_jwt_token
@@ -29,10 +30,13 @@ urlpatterns = [
     path('api/auth/', GetAccessToken.as_view()),
     path('api/login/', obtain_jwt_token),
     path('api/create-customer/', CreateCustomer.as_view()),
+    path('api/update-customer/', UpdateCustomer.as_view()),
     path('api/market-symbols/', GetMarketSymbol.as_view()),
     path('api/market-data/', GetMarketData.as_view()),
     path('api/investors/', GetInvestors.as_view()),
     path('api/investors/<int:pk>/', GetInvestorById.as_view()),
     path('api/transactions/', CreateListTransaction.as_view()),
+    path('api/cancel-transaction/<int:pk>/', CancelTransaction.as_view()),
+    path('api/upload-kyc/', UpdateKyc.as_view()),
     path('', home)
 ]

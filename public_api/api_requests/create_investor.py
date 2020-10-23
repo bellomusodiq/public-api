@@ -5,7 +5,7 @@ from accounts.models import ApiToken
 
 url = "{}/test/partners/investors".format(base_url)
 
-def create_customer(api_token, title, surname, first_name, 
+def create_investor(api_token, title, surname, first_name, 
                     other_names, gender, phone, 
                     date_of_birth, email_address, home_phone,
                     address, country, state, 

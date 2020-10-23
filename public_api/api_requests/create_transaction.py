@@ -7,9 +7,9 @@ from .config import base_url
 
 def generate_random_string():
     choices = string.ascii_letters + string.digits 
-    string_ = []
+    string_ = ''
     for _ in range(20):
-        string_.append(random.choices(choices))
+        string_ += random.choice(choices)
     return string_
 
 
