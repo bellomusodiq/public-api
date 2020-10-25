@@ -5,6 +5,7 @@ from .config import base_url
 # category = trade, price
 
 def get_market_symbol(access_token, category='trade'):
+    print(category)
     url = "{}/market/symbols?category={}".format(base_url, category)
 
     payload = {

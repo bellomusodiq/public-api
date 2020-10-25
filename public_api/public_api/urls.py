@@ -14,16 +14,25 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include, re_path
 from accounts.views import (
     home, GetAccessToken, CreateCustomer,
     GetMarketSymbol, GetMarketData,
     GetInvestors, GetInvestorById,
     CreateListTransaction, UpdateCustomer,
-    UpdateKyc, CancelTransaction
+    UpdateKyc, CancelTransaction,
+    TransactionViewSet
 )
+from django.conf import settings
+from django.conf.urls.static import static
+from rest_framework.routers import DefaultRouter
+from django.views.generic import TemplateView
 
 from rest_framework_jwt.views import obtain_jwt_token
+
+router = DefaultRouter()
+
+router.register('transactions-view', TransactionViewSet, 'transactions-view')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -38,5 +47,9 @@ urlpatterns = [
     path('api/transactions/', CreateListTransaction.as_view()),
     path('api/cancel-transaction/<int:pk>/', CancelTransaction.as_view()),
     path('api/upload-kyc/', UpdateKyc.as_view()),
-    path('', home)
+    path('api/', include(router.urls)),
 ]
+
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += [re_path(r'^.*', TemplateView.as_view(template_name='index.html'))]
+

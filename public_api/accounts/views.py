@@ -14,6 +14,13 @@ from api_requests.create_transaction import create_transaction
 from api_requests.get_transactions import get_transactions
 from api_requests.update_kyc import update_kyc
 from api_requests.cancel_transaction import cancel_transaction
+from .serializers import TransactionSerializer
+from rest_framework.viewsets import ModelViewSet
+from rest_framework_jwt.settings import api_settings
+
+
+jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
 
 
 # Create your views here.
@@ -22,6 +29,11 @@ from api_requests.cancel_transaction import cancel_transaction
 def home(request):
 
     return HttpResponse('<h1>Hello world</h1>')
+
+
+def convert_date(date):
+    [year, month, day] = date.split('-')
+    return month + '-' + day + '-' + year
 
 
 def field_verification(data: dict, fields: list):
@@ -101,19 +113,24 @@ class CreateCustomer(APIView):
             return Response({'errors': errors}, 400)
         
         api_token = ApiToken.objects.first()
+        gender = request.data['gender']
+        if gender == 'Male':
+            gender = 'M'
+        else:
+            gender = 'F'
         if not api_token:
             return Response({'message': 'api authentication is required'}, 403)
-        response = update_investor(
+        response = create_investor(
             api_token.access_token, request.data['title'], request.data['surname'], request.data['first_name'],
-            request.data['other_names'], request.data['gender'], request.data['phone'],
-            request.data['date_of_birth'], request.data['email_address'], request.data['home_phone'],
+            request.data['other_names'], gender, request.data['phone'],
+            convert_date(request.data['date_of_birth']), request.data['email_address'], request.data['home_phone'],
             request.data['address'], request.data['country'], request.data['state'],
             request.data['nationality'], request.data['state_of_origin'], request.data['city'],
             request.data['lga'], request.data['bank_account_number'], request.data['bank_name'],
             request.data['bank_account_name'],
             request.data['bank_code'], request.data['bvn'], request.data['company_name'],
             request.data['employment_type'], request.data['occupation'], request.data['identity_type'],
-            request.data['identity_number'], request.data['expiry_date'], request.data['politically_exposed'],
+            request.data['identity_number'], convert_date(request.data['expiry_date']), request.data['politically_exposed'],
             request.data['next_of_kin_name'], request.data['next_of_kin_address'], request.data['next_of_kin_email'], 
             request.data['next_of_kin_phone_number'],
             request.data['next_of_kin_relationship']
@@ -199,14 +216,13 @@ class UpdateCustomer(APIView):
 class GetMarketSymbol(APIView):
 
     def get(self, request):
-        category = request.GET.get('symbol')
+        category = request.GET.get('category')
         response = None
         access_token = ApiToken.objects.first().access_token
         if not category:
             response = get_market_symbol(access_token)
         else:
             response = get_market_symbol(access_token, category=category)
-        print(response)
         if response['status'] == 200:
             return Response({'data': response['data']})
         return Response({'error': 'something went wrong'}, 400)
@@ -215,14 +231,13 @@ class GetMarketSymbol(APIView):
 class GetMarketData(APIView):
 
     def get(self, request):
-        category = request.GET.get('symbol')
+        category = request.GET.get('category')
         response = None
         access_token = ApiToken.objects.first().access_token
         if not category:
             response = get_market_data(access_token)
         else:
             response = get_market_data(access_token, category=category)
-        print(response)
         if response['status'] == 200:
             return Response({'data': response['data']})
         return Response({'error': 'something went wrong'}, 400)
@@ -280,15 +295,16 @@ class CreateListTransaction(APIView):
         try:
             user = request.user
             response = create_transaction(self.access_token, user.investor.investor_id, request.data['instructions'],
-            request.data['trade_date_limit'], request.data['trade_action'], request.data['trade_price_limit'], request.data['trade_effective_date'],
+            convert_date(request.data['trade_date_limit']), request.data['trade_action'], request.data['trade_price_limit'], convert_date(request.data['trade_effective_date']),
             request.data['trade_units'], request.data['stock_code'])
+            print(response)
             if response['status'] == 200:
                 Transaction.objects.create(
                     user=user,
                     transaction_ref=response["transaction_ref"],
                     instructions=request.data['instructions'],
-                    trade_date_limit=request.data['trade_date_limit'],
-                    trade_effective_date=request.data['trade_effective_date'],
+                    trade_date_limit=convert_date(request.data['trade_date_limit']),
+                    trade_effective_date=convert_date(request.data['trade_effective_date']),
                     trade_action=request.data['trade_action'],
                     trade_price_limit=request.data['trade_price_limit'],
                     trade_unit=request.data['trade_units'],
@@ -341,3 +357,22 @@ class CancelTransaction(APIView):
             print(response)
         except Transaction.DoesNotExist:
             return Response({'error': 'transaction cannot be found'}, 404)
+
+
+class TransactionViewSet(ModelViewSet):
+
+    serializer_class = TransactionSerializer
+
+    def get_queryset(self):
+        queryset = Transaction.objects.all()
+
+        user = self.request.GET.get('user')
+        if user:
+            queryset = queryset.filter(user=user)
+
+        return queryset
+
+
+
+def jwt_response_payload_handler(token, user=None, request=None):
+    return dict(token=token, userid=user.id)

@@ -5,6 +5,7 @@ from .config import base_url
 # category = topgainers, toplosers, news
 
 def get_market_data(access_token, category='topgainers'):
+    print(category)
     url = "{}/market/news?category={}".format(base_url, category)
 
     payload = {
