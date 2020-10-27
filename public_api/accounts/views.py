@@ -158,7 +158,6 @@ class UpdateCustomer(APIView):
 
     def post(self, request):
         errors = field_verification(request.data, [
-            'id',
             'title',
             'surname',
             'first_name',
@@ -192,9 +191,9 @@ class UpdateCustomer(APIView):
         if not api_token:
             return Response({'message': 'api authentication is required'}, 403)
         response = update_investor(
-            api_token.access_token, request.data['id'], request.data['title'], 
+            api_token.access_token, user.investor.investor_id, request.data['title'], 
             request.data['surname'], request.data['first_name'], request.data['other_names'], 
-            request.data['gender'], request.data['phone'], request.data['date_of_birth'], 
+            request.data['gender'], request.data['phone'], convert_date(request.data['date_of_birth']), 
             request.data['email_address'], request.data['address'], request.data['country'], 
             request.data['state'], request.data['nationality'], request.data['city'],
             request.data['bank_account_number'], request.data['bank_account_name'],
